@@ -693,24 +693,6 @@
   </div>
 </div>
 
-<!-- SHEET PICKER MODAL -->
-<div class="modal-overlay" id="sheet-picker-modal">
-  <div class="modal">
-    <div class="modal-title">Select your master sheet</div>
-    <div class="modal-body">Choose the spreadsheet containing your active ASINs. ListingLens will read the <strong>Amazon Asin</strong> column automatically.</div>
-    <div class="sheet-picker" id="sheet-picker-list"></div>
-    <hr class="divider">
-    <div class="setup-step">
-      <label>OR PASTE SHEET ID DIRECTLY</label>
-      <input type="text" id="manual-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" />
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('sheet-picker-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="loadManualSheet()">Load Sheet</button>
-    </div>
-  </div>
-</div>
-
 <!-- SETTINGS MODAL -->
 <div class="modal-overlay" id="settings-modal">
   <div class="modal">
@@ -718,10 +700,6 @@
     <div class="setup-step">
       <label>SCRAPINGDOG API KEY</label>
       <input type="password" id="sd-key-input" placeholder="Enter API key…" />
-    </div>
-    <div class="setup-step">
-      <label>CONNECTED SHEET</label>
-      <input type="text" id="sheet-id-display" readonly style="color:var(--text3)" />
     </div>
     <hr class="divider">
     <div class="modal-actions">
@@ -830,6 +808,7 @@ const CONFIG = {
   CLIENT_ID: '801481705797-ofvf00mufl40gqjivd76r6r49v0qgeq9.apps.googleusercontent.com',
   SCOPES: 'https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly',
   SD_API_KEY: '6a0c2b428b253c3118667822',
+  SHEET_ID: '11UPpzvWyFdMYOasRFevpS4-rP6e8a0pOWKdW1g5vTwU',
   RATE_LIMIT_MS: 1200, // delay between Scrapingdog calls
 };
 
@@ -837,7 +816,7 @@ const CONFIG = {
 const State = {
   token: null,
   tokenExpiry: null,
-  sheetId: null,
+  sheetId: '11UPpzvWyFdMYOasRFevpS4-rP6e8a0pOWKdW1g5vTwU',
   listings: [],       // { asin, sku, masterSku, productName, description, status, data, edits }
   filter: 'all',
   familyFilter: null,
@@ -875,54 +854,14 @@ function onAuthed() {
   document.getElementById('auth-status').className = 'status-pill connected';
   document.getElementById('auth-status').innerHTML = '<div class="dot"></div><span>Connected</span>';
   document.getElementById('btn-settings').style.display = '';
-  openSheetPicker();
+  loadSheet();
 }
 
 function isTokenValid() {
   return State.token && Date.now() < State.tokenExpiry;
 }
 
-// ─────────────────────────────────────────────────────────
-// SHEET PICKER
-// ─────────────────────────────────────────────────────────
-async function openSheetPicker() {
-  showModal('sheet-picker-modal');
-  const list = document.getElementById('sheet-picker-list');
-  list.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px 0">Loading recent sheets…</div>';
 
-  try {
-    const resp = await gfetch(`https://www.googleapis.com/drive/v3/files?q=mimeType='application/vnd.google-apps.spreadsheet'&orderBy=viewedByMeTime desc&pageSize=10&fields=files(id,name,modifiedTime)`);
-    const data = await resp.json();
-    if (!data.files || data.files.length === 0) {
-      list.innerHTML = '<div style="color:var(--text3);font-size:13px">No sheets found. Paste ID below.</div>';
-      return;
-    }
-    list.innerHTML = '';
-    data.files.forEach(f => {
-      const mod = new Date(f.modifiedTime).toLocaleDateString('en-IN', { day:'numeric', month:'short' });
-      const div = document.createElement('div');
-      div.className = 'sheet-item';
-      div.innerHTML = `<span class="sheet-icon">📊</span><span class="sheet-name">${f.name}</span><span class="sheet-meta">${mod}</span>`;
-      div.onclick = () => selectSheet(f.id);
-      list.appendChild(div);
-    });
-  } catch(e) {
-    list.innerHTML = '<div style="color:var(--red);font-size:13px">Could not load Drive files. Paste sheet ID below.</div>';
-  }
-}
-
-function selectSheet(id) {
-  State.sheetId = id;
-  document.getElementById('sheet-id-display').value = id;
-  closeModal('sheet-picker-modal');
-  loadSheet();
-}
-
-function loadManualSheet() {
-  const id = document.getElementById('manual-sheet-id').value.trim();
-  if (!id) { showToast('Paste a sheet ID first', 'error'); return; }
-  selectSheet(id);
-}
 
 // ─────────────────────────────────────────────────────────
 // LOAD SHEET DATA
@@ -1463,7 +1402,6 @@ function saveSettings() {
 }
 
 async function reloadSheet() {
-  if (!State.sheetId) { showToast('No sheet connected', 'error'); return; }
   await loadSheet();
 }
 
